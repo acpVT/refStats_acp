@@ -1,0 +1,359 @@
+---
+title: "Statistics in Research Notes and Refrence"
+output: html_notebook
+---
+
+```{r}
+setwd("~/stats")
+```
+
+
+# Module 6: ANOVA
+##From Homework
+```{r}
+soap <- read.csv('soap.csv') #Read data
+#Set variables
+treatment <- as.factor(soap$ï..Treatment)
+count <- soap$Bacteria_Count
+
+# To perform an ANOVA test you first should make a variable, here called anovafit, that has the fit of the analysis of variance model using the function aov()
+# in the aov function you should have your response variable followed by a tilde (~) and then your explanatory variable
+anovafit <- aov(count ~ treatment)
+# Then use that variable in your anova function which performs the ANOVA test
+anova(anovafit) #Gives F-Value and P-Value
+
+# Visualizing what treatments are not different and which are
+boxplot(count ~ treatment, xlab = "Treatment", ylab = "Bacterial Count")
+
+# Checking Equal Variance and Normality Assumptions
+# Ploting residuals
+plot(anovafit$residuals ~ anovafit$fitted.values, pch = 20, xlab = "fitted values", ylab = "residuals")
+abline(h = 0, add = T)
+
+# Plotting Normal Quantile
+qqnorm(anovafit$residuals, pch = 20)
+qqline(anovafit$residuals, add = T)
+
+library(DescTools)
+PostHocTest(anovafit, method ='lsd') #Fisher
+PostHocTest(anovafit, method ='hsd') #Tukey
+
+library(multcomp)
+#Fisher tests with multcomp
+comp_1 <- glht(anovafit, 
+               linfct = mcp(treatment = 'Tukey'))
+summary(comp_1, test = adjusted('none'))
+#Fisher Confidence interval
+confint(comp_1, calpha = univariate_calpha())
+
+#Tukey tests with multcomp
+comp_2 <- glht(anovafit,
+               linfct = mcp(treatment = 'Tukey'))
+
+confint(comp_2)
+
+#Dunnets
+comp_3 <- glht(anovafit, linfct = mcp(treatment = 'Dunnett'))
+summary(comp_3)
+```
+
+##Example 1
+```{r}
+Learning_Time <- read.csv("10e_Learning Time.csv")
+
+method <- Learning_Time$Teaching.Method
+learn_time <- Learning_Time$Time
+# To perform an ANOVA test you first should make a variable, here called anovafit, that has the fit of the analysis of variance model using the function aov()
+# in the aov function you should have your response variable followed by a tilde (~) and then your explanatory variable
+anovafit <- aov(learn_time ~ method)
+# Then use that variable in your anova function which performs the ANOVA test
+anova(anovafit)
+
+# The ouput gives you a p-value of 0.0003978, less than our alpha, therefore we reject the null hypothesis. There is sufficient sample evidence to suggest that at least one of the teaching methods has an effect on learning time
+# How can you visualize this? We can plot all the teaching method's boxplots on the same plot and compare!
+boxplot(learn_time ~ method, xlab = "Teaching Method", ylab = "Time", main = "Effect of Teaching Method on Learning Time")
+
+# In this visualization you can see that Method C's mean does significantly differ from method A's and B's
+```
+
+##Example 2
+```{r}
+carpet <- read.csv('11b_carpet.csv')
+carpet_type <- carpet$Carpet
+durability <- carpet$Durability
+# Residual by Predicted Plot, This is the first diagnostic plot to check equality variances
+# similar to performing an ANOVA test, make a variable, here called anovafit, that has the fit of the analysis of variance model using the function aov()
+anovafit <- aov(durability ~ carpet_type)
+# Then use this fit in your plot using the residuals as the y and the fitted values as the x
+plot(anovafit$residuals ~ anovafit$fitted.values, pch = 20, xlab = "fitted values", ylab = "residuals")
+abline(h = 0)
+
+# Normality Condition
+# You can do this two ways, first way is to use the qqnorm function with your residuals
+qqnorm(anovafit$residuals, pch = 20)
+qqline(anovafit$residuals, add = T)
+
+# Another way is to use the qqPlot function (DO NOT get this confused with the qqplot function, qqPlot is from the car package)
+library(car)
+qqPlot(anovafit$residuals, pch = 20)
+
+# As you can see the actual graph and data points is the same for qqPlot and qqnorm BUT qqPlot also includes a pointwise confidence envelope
+```
+##Example 3
+```{r}
+yield <- read.csv('12b_yield.csv')
+
+# What contrast would be used to test this hypothesis?
+#         0 = 1/3(μHH + μHL + μLH) - μLL
+Yield <- yield$Yield
+TC <- as.factor(yield$TC)
+# First we have to fit the variance model, this time calling it modfit instead of anovafit (doesn't matter just switching up the names)
+modfit <- aov(Yield ~ TC)
+# To do this we have to set up the contrasts using the function rbind
+A <- rbind("1/3(HH + HL + LH) - LL" = c(1 / 3, 1 / 3, 1 / 3, -1))
+# Then we will use the glht function from the multcomp package, it will perform the comparisons with the contrast you established with the variable A
+library(multcomp)
+comparisons <- glht(modfit, linfct = mcp(TC = A))
+# Use the summary function to see the output of the contrast
+summary(comparisons)
+
+# From this you can see that the p-value is 0.681, we fail to reject the null hypothesis. There is insufficient sample evidence to indicate that the true mean yield for the LL density is significantly different from the true mean yield of the average of the first three densities.
+
+Plant <- read.csv('13_b_Plant.csv')
+
+treatment <- as.factor(Plant$Treatment)
+growth <- Plant$Growth
+# A total of fifty plant tissue cultures were grown in a lab. The cultures were randomly divided into t = 5 sets of ni = 10, after which each set was grown in a different culture solution.
+# Interest: Whether different solutions affect the average rate of tissue growth
+anovafit <- aov(growth ~ treatment)
+anova(anovafit)
+
+# The test statistic F = 74.17 leads to a rejection of H0 at level α = 0.05
+# New question: average rates of tissue growth from which solutions are different at level α = 0.05?
+# Since the overall ANOVA rejected H0, we can use Fisher’s procedure to test the significance of all multiple comparisons
+
+library(DescTools)
+PostHocTest(anovafit, method = "lsd")
+
+library(multcomp)
+comparisons1 <- glht(anovafit, linfct = mcp(treatment = "Tukey"))
+# the only difference between this and Tukey is adding test=adjusted("none") into the summary function
+summary(comparisons1, test = adjusted("none"))
+
+# Fisher Confidence intervals:
+confint(comparisons1, calpha = univariate_calpha())
+
+# If we wanted to do the Tukey method:
+PostHocTest(anovafit, method = "hsd")
+
+library(multcomp)
+comparisons2 <- glht(anovafit, linfct = mcp(treatment = "Tukey"))
+summary(comparisons2)
+confint(comparisons2)
+
+#Dunnett
+comparisons3 <- glht(anovafit, linfct = mcp(treatment = "Dunnett"))
+summary(comparisons3)
+```
+
+
+#Module 7: Simple Regression
+##From Homework
+```{r}
+senic <- read.csv('senic.csv') #Read data
+#Set variables
+length <- senic$ï..Length
+risk <- senic$Risk
+
+plot(risk ~ length) #Base plot
+cor.test(risk, length)#Compute correlation coefficient 
+
+
+modfit <- lm(risk ~ length)
+summary(modfit)#Contains the p-value and test statistic
+
+#Calculate the risk at 7.5 days
+#coefficient[1] = intercept
+#coefficient[2] = slope
+y_bar <- modfit$coefficients[1] + modfit$coefficients[2] * 7.5
+print(y_bar)
+
+#Test statistic 
+#If we were doing another type of analysis where we were testing against a constant (C), we would use (Slope - C) / Error
+
+#T.stat = slope / std of the slope (Std. Error length)
+t_obs <- (modfit$coefficients[2]) / 0.05632
+print(t_obs)
+
+#P-value
+#t_obs = Calculated P-value 
+pt(t_obs, df = 111, lower.tail = FALSE)
+#0.025 = 95 confidence interval / 2
+t <- qt(0.025, df = 111, lower.tail = FALSE)
+#Intercept +/- (t * Std. Error or intercept)
+lower <- modfit$coefficients[1] - (t * 0.55386)
+upper <- modfit$coefficients[1] + (t * 0.55386)
+upper
+lower
+```
+
+## Examples
+```{r}
+Chickens <- read.csv('14c_Chickens.csv')
+# provides the relevant information for carrying out hypothesis tests and constructing confidence intervals for B0 and B1
+# EX) In the weight gain in chickens study, farm managers determine that a lysine diet is cost effective only if a one gram increase in ingested lysine leads to more than 25 gram increase in weight gain on average
+# H0 : B1 <= 25 versus B0 > 25
+
+wtgain <- Chickens$ï..wtgain
+lysine <- Chickens$lysine
+# now we make an estimate table, lm is used to fit linear models:
+modfit <- lm(wtgain ~ lysine)
+summary(modfit)
+
+# then look at the summary and that's your estimate table!
+# If the hypotheses being tested for the slope in the estimate table were H0: B1 = 0 HA: B1 /= 0 then the estimate table would give you the correct p-val and other statistics
+# But since we want a non-zero null value (25), we can do the test ourself using the necessary information in the estimate table to do this...
+
+# B1 is the estimated slope
+B1 <- 35.828
+# c is some constant that you want to test ( in this case 25)
+c <- 25
+# SE_B1 is the estimated std for the slope
+SE_B1 <- 6.957
+t_obs <- (B1 - c) / SE_B1
+t_obs
+
+# So we computed the test statistic to be 1.556
+# We will compute the p-val with the t-distribution
+pt(t_obs, df = 10, lower.tail = FALSE)
+
+# We can also find the confidence interval from the estimate table
+t <- qt(.025, df = 10, lower.tail = FALSE)
+lower <- B1 - (t * SE_B1)
+upper <- B1 + (t * SE_B1)
+# A 95% confidence interval for B1 is:
+print(c(lower, upper))
+
+# 20.33 < B1 < 51.33
+```
+
+
+```{r}
+# Measurements of water taste and water hardness were obtained from n = 8 communities in a wide region. Taste was measured by a subjective rating scale, and water hardness by the levels of magnesium. The data are:
+water <- read.csv("14d_water.csv")
+View(water)
+taste <- water$ï..Taste
+mag <- water$Mag
+plot(mag, taste, pch = 20, ylab = "Taste Rating", xlab = "Magnesium (mg/1)")
+
+# Our interest is to fit a linear regression model, construct the ANOVA table and then test at level  = 0.05:
+# H0: B1 = 0 versus HA: B1 /= 0
+anovafit <- aov(taste ~ mag)
+anova(anovafit)
+
+modfit_water <- lm(taste ~ mag)
+summary(modfit_water)
+
+# Model: ŷ = -22.41 + 7.30x
+# H0: B1 = 0 versus HA: B1 /= 0, Fobs = 6.8351, p-val = 0.03988
+# Conclusion: Hardness level in water has an effect on taste.
+# Test on Intercept:
+# H0: B0 = 0 versus HA: B0 /= 0
+# Look at the p-value for the intercept in the estimates table
+# In this case our intercept has a p-value of 0.5092 (>0.05) therefore the decision is to fail to reject the claim and conclude that there is insufficient evidence to suggest that the average water taste rating is non-zero for communities having water hardness levels at zero milligrams of magnesium per liter.
+# Confidence interval:
+n <- 8
+SE_B0 <- 31.934
+B0 <- -22.407
+t <- qt(.025, df = n - 2, lower.tail = FALSE)
+lower <- B0 - (t * SE_B0)
+upper <- B0 + (t * SE_B0)
+# A 95% confidence interval for B0 is:
+print(c(lower, upper))
+```
+# Module 8: Nonparametrics
+##Examples
+```{r}
+Example_2 <- read.csv('wilcoxon.csv')
+
+# Use the approximate Wilcoxon Sum Rank test to determine if water diffusion across a membrane of newborns differs for premature babies versus full term babies?
+premature <- Example_2$Diffusion[Example_2$Type == "Premature"]
+full <- Example_2$Diffusion[Example_2$Type == "Full Term"]
+# Use the function wilcox.test, since we have an x and y for the input it will calculate the rank sum test for two independent samples:
+wilcox.test(premature, full)
+
+# Example of a Wilcoxon signed rank test:
+# lets assume that x1 and y1 are two dependent samples
+x1 <- c(2, 4, 7, 2, 8, 9, 2, 5, 4)
+y1 <- c(3, 6, 7, 4, 8, 3, 5, 2, 1)
+wilcox.test(x1, y1, paired = TRUE)
+
+# In a study researchers examined bone strength. They collected 10 cadaveric femurs from subjects in three age groups: young (19-49 years), middle aged (50-69 years), and elderly (70 years or older). One of the outcome measures was the force in newtons required to fracture the bone.
+# Use the Kruskal-Wallis test to determine if there are any differences among bone strength from different age groups?
+Example_4 <- read.csv('kruskall.csv')
+
+force <- Example_4$force
+group <- as.factor(Example_4$Group)
+kruskal.test(force ~ group)
+# With a p-val of 0.0024 we reject the null hypothesis since the p-value is less than 0.05. There is sufficient sample evidence to conclude that at least one of the three age groups differs with respect to bone strength.
+```
+
+
+
+```{r}
+library(multcomp)
+poets <- read.csv('Deadpoets.csv')
+type <- poets$Type
+age <- poets$Age
+
+
+anovafit <- aov(age ~ type)
+anova(anovafit)
+
+
+library(DescTools)
+PostHocTest(anovafit, method = "lsd")
+PostHocTest(anovafit, method = "hsd")
+for(i in 1:length(poets$Type)){
+    if(poets$Type[i] == 'Nonfiction'){
+        poets$Type[i] == 'Novels'
+    }
+}
+
+type <- poets$Type
+age <- poets$Age
+
+
+anovafit <- aov(age ~ type)
+anova(anovafit)
+```
+
+
+
+```{r}
+beer <- read.csv('beer.csv')
+
+b <- beer$Beers
+BAC <- beer$BAC
+
+modfit <- lm(BAC ~ b)
+summary(modfit)
+
+y <- modfit$coefficients[1] + (5 * modfit$coefficients[2])
+y
+t_obs <- (modfit$coefficients[2] - 5) / 0.002402
+print(t_obs)
+
+#P-value
+#t_obs = Calculated P-value 
+pt(t_obs, df = 14, lower.tail = FALSE)
+#0.025 = 95 confidence interval / 2
+t <- qt(0.025, df = 14, lower.tail = FALSE)
+#Intercept +/- (t * Std. Error or intercept)
+lower <- modfit$coefficients[1] - (t * 0.012638)
+upper <- modfit$coefficients[1] + (t * 0.012638)
+upper
+lower
+
+predict(modfit,beer,interval="predict")
+```
